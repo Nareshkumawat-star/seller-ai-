@@ -139,6 +139,53 @@ describe("POST /api/generate", () => {
     expect(body.error.code).toBe("timeout");
   });
 
+  it("retries once when the model ignores a Hindi request, then reports verification", async () => {
+    const hindiListing = {
+      ...validListing,
+      language: "hi",
+      title: "हस्तनिर्मित सूती कंबल",
+      shortDescription: "हस्तनिर्मित सूती कंबल, आरामदायक और साँस लेने योग्य।",
+      fullDescription: "पारंपरिक करघे पर बुना गया सूती कंबल, प्राकृतिक नीले रंजक के साथ।",
+      bulletPoints: ["साँस लेने योग्य कपास"],
+      alternativeTitles: ["सूती कंबल"],
+      metaDescription: "हस्तनिर्मित सूती कंबल, ठंडे पानी में धुलने योग्य।",
+    };
+    const fetchMock = vi.fn(async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body)) as { messages: Array<{ role: string }> };
+      const isRetry = body.messages.some((message) => message.role === "assistant");
+      return isRetry ? chatResponse(hindiListing) : chatResponse({ ...validListing, language: "hi" });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(request({ form: { ...exampleProductInput, language: "hi" } }));
+    const body = (await response.json()) as {
+      listing: { title: string; warnings: string[] };
+      meta: { languageVerified: boolean; detectedScript: string };
+    };
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(body.listing.title).toBe("हस्तनिर्मित सूती कंबल");
+    expect(body.meta.languageVerified).toBe(true);
+    expect(body.meta.detectedScript).toBe("devanagari");
+  });
+
+  it("warns instead of claiming a language the model did not write", async () => {
+    // The model echoes language: "hi" but writes English — the app must not label it Hindi.
+    vi.stubGlobal("fetch", vi.fn(async () => chatResponse({ ...validListing, language: "hi" })));
+
+    const response = await POST(request({ form: { ...exampleProductInput, language: "hi" } }));
+    const body = (await response.json()) as {
+      listing: { warnings: string[] };
+      meta: { languageVerified: boolean; detectedScript: string };
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.meta.languageVerified).toBe(false);
+    expect(body.meta.detectedScript).toBe("latin");
+    expect(body.listing.warnings.join(" ")).toMatch(/Devanagari/i);
+  });
+
   it("throttles repeated requests", async () => {
     vi.stubEnv("RATE_LIMIT_PER_MINUTE", "1");
     vi.stubGlobal("fetch", vi.fn(async () => chatResponse(validListing)));

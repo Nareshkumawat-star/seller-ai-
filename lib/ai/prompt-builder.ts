@@ -17,9 +17,9 @@ const LENGTH_GUIDE: Record<string, string> = {
 
 const LANGUAGE_GUIDE: Record<string, string> = {
   en: "Write everything in natural English.",
-  hi: "Write everything in natural Hindi using Devanagari script. Do not transliterate Hindi into Latin letters.",
+  hi: "Write everything in natural Hindi using Devanagari script. Do not transliterate Hindi into Latin letters and do not answer in English. Every sentence must contain Devanagari characters (for example: हस्तनिर्मित सूती कंबल). Keep JSON keys in English, but every human-readable value must be Hindi in Devanagari script.",
   bilingual:
-    "Write bilingual content: each description field should contain the English version first, then a blank line, then the Hindi version in Devanagari. Titles, keywords, and tags should be in English with Hindi phrases where they help search.",
+    "Write bilingual content: each description field must contain the English version first, then a blank line, then the same content in Hindi using Devanagari script. Titles, keywords, and tags stay in English with Hindi phrases in Devanagari where they help search. Never answer in English only.",
 };
 
 export type PromptImageNotes = {

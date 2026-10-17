@@ -110,6 +110,8 @@ export type ListingEditorProps = {
   onRegenerate: () => void;
   regenerating: boolean;
   model?: string;
+  /** False when the model did not actually write the requested language. */
+  languageVerified?: boolean;
 };
 
 export function ListingEditor({
@@ -121,6 +123,7 @@ export function ListingEditor({
   onRegenerate,
   regenerating,
   model,
+  languageVerified,
 }: ListingEditorProps) {
   const [tab, setTab] = React.useState<TabId>("overview");
   const [exportState, setExportState] = React.useState<string | null>(null);
@@ -165,6 +168,11 @@ export function ListingEditor({
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-4 py-3">
         <Badge tone="accent">{market.label}</Badge>
         <Badge tone="neutral">{listing.language === "hi" ? "हिन्दी" : listing.language === "bilingual" ? "EN + हिन्दी" : "English"}</Badge>
+        {languageVerified === false ? (
+          <Badge tone="warning" title="The model did not write the requested language">
+            Language mismatch
+          </Badge>
+        ) : null}
         {model ? <span className="hidden truncate text-xs text-muted-foreground sm:inline">{model}</span> : null}
         {edited ? <Badge tone="warning">Edited</Badge> : null}
         <div className="ml-auto flex items-center gap-1.5">

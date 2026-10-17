@@ -1,5 +1,10 @@
 import { chat, InferenceError } from "@/lib/ai/ollama-client";
-import { ListingParseError, parseListingOutput } from "@/lib/ai/output-schema";
+import {
+  strictLanguageRetryInstruction,
+  verifyLanguage,
+  withLanguageWarning,
+} from "@/lib/ai/language-check";
+import { ListingParseError, parseListingOutput, type ListingResult } from "@/lib/ai/output-schema";
 import { buildListingPrompt } from "@/lib/ai/prompt-builder";
 import { contentLengthExceeded, inferenceErrorResponse, jsonError } from "@/lib/api/http";
 import { getServerConfig } from "@/lib/config/env";
@@ -61,28 +66,62 @@ export async function POST(request: Request) {
   const prompt = buildListingPrompt(input, imageNotes.length ? { observations: imageNotes } : undefined);
 
   try {
-    const completion = await chat({
-      model: config.model,
-      messages: [
-        { role: "system", content: prompt.system },
-        { role: "user", content: prompt.user },
-      ],
-      json: true,
-    });
+    const messages = [
+      { role: "system" as const, content: prompt.system },
+      { role: "user" as const, content: prompt.user },
+    ];
 
-    const listing = parseListingOutput(completion.content, {
+    const completion = await chat({ model: config.model, messages, json: true });
+    let listing = parseListingOutput(completion.content, {
       language: input.language,
       platform: input.platform,
     });
+    let latencyMs = completion.durationMs;
+
+    // Echoing `language: "hi"` is not proof of Hindi output, so check the actual
+    // characters. One bounded retry with a stricter instruction, never a loop.
+    let verification = verifyLanguage(listing, input.language);
+    if (!verification.ok) {
+      console.warn(`[generate] language mismatch detected: requested=${input.language} script=${verification.detected}`);
+      try {
+        const retry = await chat({
+          model: config.model,
+          messages: [
+            ...messages,
+            { role: "assistant" as const, content: completion.content.slice(0, 4000) },
+            { role: "user" as const, content: strictLanguageRetryInstruction(input.language) },
+          ],
+          json: true,
+        });
+        const retryListing = parseListingOutput(retry.content, {
+          language: input.language,
+          platform: input.platform,
+        });
+        const retryVerification = verifyLanguage(retryListing, input.language);
+        latencyMs += retry.durationMs;
+        if (retryVerification.ok) {
+          listing = retryListing;
+          verification = retryVerification;
+        }
+      } catch (retryError) {
+        console.warn(
+          `[generate] language retry failed: ${retryError instanceof InferenceError ? retryError.code : "unknown"}`,
+        );
+      }
+    }
+
+    const verified = withLanguageWarning(listing as ListingResult, verification);
 
     return Response.json(
       {
-        listing,
+        listing: verified,
         meta: {
           model: completion.model,
-          latencyMs: completion.durationMs,
+          latencyMs,
           platform: input.platform,
           language: input.language,
+          languageVerified: verification.ok,
+          detectedScript: verification.detected,
           generatedAt: new Date().toISOString(),
         },
       },

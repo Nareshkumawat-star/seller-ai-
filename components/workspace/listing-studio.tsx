@@ -32,7 +32,7 @@ import {
 } from "@/lib/validation/product-input";
 
 type GenError = { message: string; hint?: string; code?: string; fields?: Record<string, string> };
-type Meta = { model: string; latencyMs: number; generatedAt: string };
+type Meta = { model: string; latencyMs: number; generatedAt: string; languageVerified?: boolean };
 
 export function ListingStudio() {
   const params = useSearchParams();
@@ -398,6 +398,7 @@ export function ListingStudio() {
                 onRegenerate={() => void generate()}
                 regenerating={loading}
                 model={meta?.model}
+                languageVerified={meta?.languageVerified}
               />
             </>
           ) : loading ? (

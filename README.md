@@ -31,6 +31,10 @@ better listings without another subscription.
 - **Real local inference** — server-side calls to Ollama's `/api/chat` with JSON formatting.
 - **Strict output validation** — Zod schema, code-fence/chatter tolerance, per-field repair, and
   recoverable errors instead of silent corruption.
+- **Language verification** — the requested language is checked against the actual characters
+  returned. If Hindi/bilingual was requested but the model wrote Latin script, the server retries
+  once with a stricter instruction; if it still fails, the result is flagged in `warnings` and the
+  UI shows a “Language mismatch” badge instead of labelling English text as Hindi.
 - **Marketplace templates** — generic, Shopify, Etsy, eBay guidance with configurable title/tag limits.
 - **Editable results** — every field editable, per-field reset, reset all, regenerate, copy one field,
   copy whole listing, export TXT / CSV / JSON (RFC 4180 escaping).
@@ -222,6 +226,21 @@ The application code is MIT (see [`LICENSE`](./LICENSE)). Model weights carry th
 and those terms differ between models and versions — check the model card before commercial use.
 Nothing here grants rights to model weights. Document the licence of whichever tag you deploy.
 
+### Verified against a real model (not mocked)
+
+On Ollama 0.40.0, CPU-only Windows, with `qwen2.5:3b` and `qwen2.5vl:3b` installed:
+
+| Check | Result |
+| --- | --- |
+| `GET /api/health` (production build) | Connected, model installed, vision resolved from `/api/show` capabilities |
+| `POST /api/generate` (English, Etsy, short) | Complete validated listing, ~69 s |
+| `POST /api/generate` (Hindi, Shopify) | Devanagari output on the first attempt, `languageVerified: true`, ~101 s |
+| `POST /api/generate` before the language fix | Model echoed `language: "hi"` while writing English — mismatch now detected, retried, and flagged |
+| `POST /api/analyze-image` | Real observations from `qwen2.5vl:3b` |
+
+Timings depend on the machine; they are recorded here because "works locally" should mean something
+measurable.
+
 ## 17. Current limitations
 
 - No marketplace publishing integration (by design — generate, review, copy).
@@ -232,6 +251,11 @@ Nothing here grants rights to model weights. Document the licence of whichever t
 - Vision analysis requires a separately configured vision model and is deliberately conservative.
 - Structured output relies on Ollama's JSON formatting plus Zod validation, not on grammar-constrained
   decoding, so very small models can still produce unusable JSON (handled as a recoverable error).
+- Language quality depends on the model. A 3B CPU model needed a stricter prompt to produce Devanagari
+  and can still drift; the app detects that case and says so rather than mislabelling the output.
+- The default documented tag `qwen3:4b` was not installed on the development machine — pull it, or set
+  `OLLAMA_MODEL` to a tag you have (`qwen2.5:3b` is what the numbers above were produced with).
+- Language verification checks script, not fluency or translation quality.
 
 ## 18. Future roadmap
 

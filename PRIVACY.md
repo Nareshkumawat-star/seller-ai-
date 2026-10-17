@@ -77,6 +77,17 @@ schema-validated before display, and is prompted to avoid invented certification
 reviews, sales figures, medical/environmental performance claims, and endorsements. It can still be
 wrong, incomplete, or off-tone — **you are responsible for verifying every claim before publishing.**
 
+The requested language is verified against the characters actually returned. If Hindi or bilingual was
+requested and the model wrote Latin script, the server retries once with a stricter instruction and,
+if that still fails, records a warning and shows a “Language mismatch” badge. The app does not label
+English text as Hindi.
+
+### One retry, and what it means for privacy
+
+The language mismatch retry sends the same prompt plus the model's own previous answer back to the
+same inference host — nowhere else. It is bounded to a single retry so a failing model is never
+repeatedly called (no infinite retry loops, no runaway compute).
+
 ## 8. Your controls
 
 - Clear saved listings in **Settings → Local data** or **My Listings → Clear all**.
