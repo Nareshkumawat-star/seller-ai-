@@ -1,0 +1,40 @@
+# Render Blueprint — deploys the Next.js app (frontend + API routes).
+#
+# IMPORTANT: this service does NOT run Ollama. Render's free instance is
+# CPU-only and a model host needs persistent multi-gigabyte storage.
+# After deploying, set OLLAMA_BASE_URL to a secured inference host (private
+# network or an authenticated endpoint) or the UI will honestly report
+# "AI offline" and refuse to fabricate output.
+services:
+  - type: web
+    name: seller-ai
+    runtime: node
+    plan: free
+    region: oregon
+    # Change this if you push to a differently named default branch.
+    branch: main
+    # `npm ci` requires the committed package-lock.json.
+    buildCommand: npm ci --legacy-peer-deps && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 24.11.0
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: OLLAMA_BASE_URL
+        sync: false # set in the dashboard: https://your-inference-host:11434
+      - key: OLLAMA_MODEL
+        value: qwen3:4b
+      - key: OLLAMA_VISION_MODEL
+        value: ""
+      - key: OLLAMA_TIMEOUT_MS
+        value: "120000"
+      - key: MAX_IMAGE_SIZE_MB
+        value: "5"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "12"
+      # Set this only if your inference host requires a bearer token.
+      - key: OLLAMA_API_KEY
+        sync: false
