@@ -112,9 +112,12 @@ export async function listModels(timeoutMs = 5_000): Promise<string[]> {
   if (!Array.isArray(models)) {
     throw new InferenceError("bad_response", 502, "The inference host did not return a model list.");
   }
-  return models
-    .map((entry) => entry.name ?? entry.model ?? "")
+  // Ollama can return the same tag more than once (duplicate manifests). Dedupe so
+  // counts and React keys derived from this list stay unique.
+  const names = models
+    .map((entry) => entry.name?.trim() || entry.model?.trim() || "")
     .filter((name): name is string => Boolean(name));
+  return Array.from(new Set(names));
 }
 
 async function showModelCapabilities(
